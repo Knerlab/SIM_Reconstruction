@@ -4,9 +4,9 @@
 """
 
 import tifffile as tf
-import si_recon_3d_p36_cuda_new as si
+import 3dsim_recon_p36 as si
 
-fns = r'C:/Users/rl74173/Desktop/20190927-141046_a549_ao_si3d_stack_.tif'
+fns = r'' #raw data file
 img = tf.imread(fns)
 
 p = si.si3D(img,5,3,0.67,1.2)
