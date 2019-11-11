@@ -6,7 +6,7 @@ import 3dsim_recon_p36 as si
 import tifffile as tf
 import numpy as np
 #data file
-fns = r'C:/Users/rl74173/Desktop/Image_based_ao_correction/20190115-140835_AlphaTN4_actin_si3d_ao_stacks_/20190115-140835_AlphaTN4_actin_si3d_ao_stacks_.tif'
+fns = r'' #raw data file
 img = tf.imread(fns)
 #1st angle parameters
 x1 = np.array([3.155, 0.354])
