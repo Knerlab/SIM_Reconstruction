@@ -1,21 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar 16 21:00:59 2020
-
-@author: linruizhe
-
 3D structured illumination reconstruction with python 3.6 
-Using CUDA to accelarate fft computation
-Ruizhe Lin   07/02/2018
-@author: rl74173
-
-Add guassian filter, padding, backgroudn sub(histogram)
-Ruizhe Lin   04/29/2019
-
 """
 
 import os
-temppath = r'C:/Users/linruizhe/Documents/Python Scripts/temp'
+temppath = r'C:/Users/***/Documents/Python Scripts/temp'
 join = lambda fn: os.path.join(temppath,fn)
 
 import tifffile as tf
@@ -30,8 +19,8 @@ class si3D(object):
 
     def __init__(self, fnd, nph, nangles, wavelength, na):
         self.img_stack = tf.imread(fnd)
-        # self.img_stack = self.subback(self.img_stack)
-        # self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
+        self.img_stack = self.subback(self.img_stack)
+        self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
         nz,nx,ny = self.img_stack.shape
         self.nz = int(nz/nph/nangles)
         self.nx = nx
@@ -252,25 +241,6 @@ class si3D(object):
                 magarr[m] = 0.0
             else:
                 magarr[m] = temp
-        print(spz_iter)
-        print(magarr)
-        figure()
-        plot(spz_iter,magarr)
-        k = np.where( magarr == magarr.max() )
-        spzmax = k[0]*d_spz - r_spz + spz
-        return (spzmax)
-    
-    def mapoverlapz1(self,angle,spacing,spz,nps=10,r_spz=0.1):
-        d_spz = 2*r_spz/nps
-        spz_iter = np.arange(-r_spz,r_spz+d_spz/2,d_spz)+spz
-        magarr = np.zeros((nps+1))
-        for m,z in enumerate(spz_iter):
-            print (m)
-            mag, phase = self.getoverlap1(angle,spacing,z)
-            if np.isnan(mag):
-                magarr[m] = 0.0
-            else:
-                magarr[m] = mag
         print(spz_iter)
         print(magarr)
         figure()
