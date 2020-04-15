@@ -1,35 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-3D Structured Illumination Reconstruction Algorothm with python 3.6 
-Using CUDA to accelarate FFT computation   07/02/2018
-Add Guassian filter, padding and backgroudn substraction(histogram)  04/29/2019
-Add Apodization  06/22/2019
+Created on Mon Mar 16 21:00:59 2020
 
-Note: Raw data z stack number must be even!!!
+@author: linruizhe
 
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+3D structured illumination reconstruction with python 3.6 
+Using CUDA to accelarate fft computation
+Ruizhe Lin   07/02/2018
+@author: rl74173
+
+Add guassian filter, padding, backgroudn sub(histogram)
+Ruizhe Lin   04/29/2019
+
 """
 
 import os
-temppath = 'C:/Users/rl74173/Documents/Python Code/temp'
+temppath = r'C:/Users/linruizhe/Documents/Python Scripts/temp'
 join = lambda fn: os.path.join(temppath,fn)
-
-os.environ['NUMBAPRO_CUDALIB']=r'C:/Users/rl74173/AppData/Local/Continuum/anaconda3/pkgs/cudatoolkit-9.0-1/Library/bin'
 
 import tifffile as tf
 import psfsim36
 from pylab import imshow, subplot, figure, plot
 import numpy as np
-from numba import cuda
-from pyculib.fft.binding import Plan, CUFFT_C2C
+from cupyfft import fftn, ifftn
 from scipy.fftpack import fftshift
 from scipy import signal
 
 class si3D(object):
 
-    def __init__(self,img_stack,nph,nangles,wavelength,na):
-        self.img_stack = self.subback(img_stack)
-        self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
+    def __init__(self, fnd, nph, nangles, wavelength, na):
+        self.img_stack = tf.imread(fnd)
+        # self.img_stack = self.subback(self.img_stack)
+        # self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
         nz,nx,ny = self.img_stack.shape
         self.nz = int(nz/nph/nangles)
         self.nx = nx
@@ -46,16 +48,14 @@ class si3D(object):
         self.dpz = 1/((self.nz*2.)*(self.dz/2.))
         self.radius_xy = (2*self.na/self.wl)/self.dpx
         self.radius_z = ((self.na**2)/(2*self.wl))/self.dpz
-        self.strength = 0.00001
-        self.fwhm = 0.99
-        self.minv = 0.0
-        self.thre = 1.
-        self.minv = 0.0
-        self.sigma = 4.
+        self.strength = 1.
+        self.sigma = 8.
         self.eta = 0.08
-        self.n = 1.
+        self.expn = 1.
         self.axy = 0.8
         self.az = 0.8
+        self.zoa = 10e-2
+        self.nangle = 0
         self.psf = self.getpsf()
         self.sepmat = self.sepmatrix()
         self.meshgrid()
@@ -64,15 +64,11 @@ class si3D(object):
         self.img_stack = self.img_stack.reshape(self.nz,nangles,nph,nx,ny).swapaxes(0,1).swapaxes(1,2)
 
     def subback(self,img):
-        nz, nx, ny = img.shape
-        for i in range(nz):
-            data = img[i,:,:]
-            hist, bin_edges = np.histogram(data, bins=np.arange(data.min(),data.max()) )
-            ind = np.where(hist == hist.max())
-            bg = bin_edges[np.max(ind)+1]
-            data[data<=bg] = 0.
-            data[data>bg] = data[data>bg] - bg
-            img[i,:,:] = data
+        hist, bin_edges  = np.histogram(img, bins=np.arange(img.min(),img.max(),256))
+        ind = np.where(hist == hist.max())
+        bg = bin_edges[np.max(ind[0]*2)]
+        img[img<=bg] = 0.
+        img[img>bg] = img[img>bg] - bg
         return img
         
     def meshgrid(self):
@@ -98,8 +94,8 @@ class si3D(object):
         xv = self.xv
         yv = self.yv
         a = np.exp(2j*np.pi*(kx*xv+ky*yv))*np.cos(2*np.pi*kz*zv)
-        return a.astype(np.complex64)
-    
+        return a
+
     def sepmatrix(self):
         nphases = self.nphases
         norders = self.norders
@@ -129,20 +125,21 @@ class si3D(object):
         psf1 = psf.stack
         psf1 = (psf1/psf1.sum()).astype(np.complex64)
         return psf1
-
-    def separate(self, nangle=0):
+        
+    def separate(self, nang=0):
+        self.nangle = nang
         npx = self.nz*self.nx*self.ny
         nz = self.nz
         nx = self.nx
         ny = self.ny
-        out = np.dot(self.sepmat,self.img_stack[nangle].reshape(self.nphases,npx))
-        self.img_0 = fftshift(self.interp(out[0].reshape(nz,nx,ny))*self.winf).astype(np.complex64)
-        self.img_1_0 = fftshift(self.interp((out[1]+1j*out[2]).reshape(nz,nx,ny))*self.winf).astype(np.complex64)
-        self.img_1_1 = fftshift(self.interp((out[1]-1j*out[2]).reshape(nz,nx,ny))*self.winf).astype(np.complex64)
-        self.img_2_0 = fftshift(self.interp((out[3]+1j*out[4]).reshape(nz,nx,ny))*self.winf).astype(np.complex64)
-        self.img_2_1 = fftshift(self.interp((out[3]-1j*out[4]).reshape(nz,nx,ny))*self.winf).astype(np.complex64)
+        out = np.dot(self.sepmat,self.img_stack[nang].reshape(self.nphases,npx))
+        self.img_0 = fftshift(self.interp(out[0].reshape(nz,nx,ny))*self.winf)
+        self.img_1_0 = fftshift(self.interp((out[1]+1j*out[2]).reshape(nz,nx,ny))*self.winf)
+        self.img_1_1 = fftshift(self.interp((out[1]-1j*out[2]).reshape(nz,nx,ny))*self.winf)
+        self.img_2_0 = fftshift(self.interp((out[3]+1j*out[4]).reshape(nz,nx,ny))*self.winf)
+        self.img_2_1 = fftshift(self.interp((out[3]-1j*out[4]).reshape(nz,nx,ny))*self.winf)
 
-    def getoverlap1(self,angle,spacingx,spacingz):
+    def getoverlap1(self,angle,spacingx,spacingz,plot=False):
         ''' shift 2nd order data '''
         dx = self.dx / 2
         dz = self.dz / 2
@@ -153,9 +150,9 @@ class si3D(object):
         nxh = self.nx
         nyh = self.ny
         
-        ysh = self.shiftmat(kz,kx,ky).astype(np.complex64)
-        otf = self.cufftn((self.psf*ysh))
-        yshf = np.abs(self.cufftn(ysh))
+        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
+        otf = fftn((self.psf*ysh))
+        yshf = np.abs(fftn(ysh))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -168,9 +165,9 @@ class si3D(object):
         zsp = self.zerosuppression( sz, sx, sy)
         otf = otf * zsp
         
-        ysh = self.shiftmat(0.,kx,ky).astype(np.complex64)
+        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+0.*self.zv))
         imgf = self.img_1_0.astype(np.complex64)
-        imgf = self.cufftn((imgf*ysh))
+        imgf = fftn((imgf*ysh))
         
         cutoff = self.cutoff
         imgf0 = self.imgf0
@@ -178,6 +175,9 @@ class si3D(object):
         wimgf0 = otf*imgf0
         wimgf1 = otf0*imgf
         msk = (np.abs(otf0*otf)>cutoff).astype(np.complex64)
+        if plot==True:
+            tf.imshow(np.abs((msk*wimgf1*wimgf0.conj())/(msk*wimgf0*wimgf0.conj())))
+            tf.imshow(np.angle((msk*wimgf1*wimgf0.conj())/(msk*wimgf0*wimgf0.conj())))
         a = np.sum(msk*wimgf1*wimgf0.conj())/np.sum(msk*wimgf0*wimgf0.conj())
         mag = np.abs(a)
         phase = np.angle(a)
@@ -218,35 +218,49 @@ class si3D(object):
         ky = dx*np.sin(angle)/(spacingx*2)
         kz = dz/spacingz
 
-        ysh = self.shiftmat(kz,kx,ky).astype(np.complex64)
-        otf = self.cufftn((self.psf*ysh))
+        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
+        otf = fftn((self.psf*ysh))
+        yshf = np.abs(fftn(ysh))
+        nxh = self.nx
+        nyh = self.ny
+        sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
+        if (sx<nxh):
+            sx = sx
+        else:
+            sx = sx-2*nxh
+        if (sy<nyh):
+            sy = sy
+        else:
+            sy = sy-2*nyh 
+        zsp = self.zerosuppression( sz, sx, sy)
+        otf = otf * zsp
 
         ysh = self.shiftmat(0.,kx,ky).astype(np.complex64)
         imgf = self.img_1_0.astype(np.complex64)
-        imgf = self.cufftn((imgf*ysh))
+        imgf = fftn((imgf*ysh))
         temp = (np.abs(imgf*otf)**2).sum()
         return temp
 
-#    def mapoverlapz(self,angle,spacing,spz,nps=10,r_spz=0.1):
-#        d_spz = 2*r_spz/nps
-#        spz_iter = np.arange(-r_spz,r_spz+d_spz/2,d_spz)+spz
-#        magarr = np.zeros((nps+1))
-#        for m,z in enumerate(spz_iter):
-#            print (m)
-#            temp = self.getoverlapz(angle,spacing,z)
-#            if np.isnan(temp):
-#                magarr[m] = 0.0
-#            else:
-#                magarr[m] = temp
-#        print(spz_iter)
-#        print(magarr)
-#        figure()
-#        plot(spz_iter,magarr)
-#        k = np.where( magarr == magarr.max() )
-#        spzmax = k[0]*d_spz - r_spz + spz
-#        return (spzmax)
-        
     def mapoverlapz(self,angle,spacing,spz,nps=10,r_spz=0.1):
+        d_spz = 2*r_spz/nps
+        spz_iter = np.arange(-r_spz,r_spz+d_spz/2,d_spz)+spz
+        magarr = np.zeros((nps+1))
+        for m,z in enumerate(spz_iter):
+            print (m)
+            temp = self.getoverlapz(angle,spacing,z)
+            if np.isnan(temp):
+                magarr[m] = 0.0
+            else:
+                magarr[m] = temp
+        print(spz_iter)
+        print(magarr)
+        figure()
+        plot(spz_iter,magarr)
+        k = np.where( magarr == magarr.max() )
+        spzmax = k[0]*d_spz - r_spz + spz
+        return (spzmax)
+    
+    def mapoverlapz1(self,angle,spacing,spz,nps=10,r_spz=0.1):
         d_spz = 2*r_spz/nps
         spz_iter = np.arange(-r_spz,r_spz+d_spz/2,d_spz)+spz
         magarr = np.zeros((nps+1))
@@ -265,7 +279,7 @@ class si3D(object):
         spzmax = k[0]*d_spz - r_spz + spz
         return (spzmax)
 
-    def getoverlap2(self,angle,spacingx):
+    def getoverlap2(self,angle,spacingx,plot=False):
         ''' shift 2nd order data '''
         dx = self.dx / 2
         kx = dx*np.cos(angle)/spacingx
@@ -275,9 +289,9 @@ class si3D(object):
         nxh = self.nx
         nyh = self.ny
         
-        ysh = self.shiftmat(kz,kx,ky).astype(np.complex64)
-        otf = self.cufftn(self.psf*ysh)
-        yshf = np.abs(self.cufftn(ysh))
+        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
+        otf = fftn(self.psf*ysh)
+        yshf = np.abs(fftn(ysh))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -287,11 +301,11 @@ class si3D(object):
             sy = sy
         else:
             sy = sy-2*nyh 
-        zsp = self.zerosuppression( sz, sx, sy)
+        zsp = self.zerosuppression(sz, sx, sy)
         otf = otf * zsp
         
         imgf = self.img_2_0
-        imgf = self.cufftn(imgf*ysh)
+        imgf = fftn(imgf*ysh)
         
         cutoff = self.cutoff
         imgf0 = self.imgf0
@@ -299,6 +313,9 @@ class si3D(object):
         wimgf0 = otf*imgf0
         wimgf1 = otf0*imgf
         msk = (np.abs(otf0*otf)>cutoff).astype(np.complex64)
+        if plot==True:
+            tf.imshow(np.abs((msk*wimgf1*wimgf0.conj())/(msk*wimgf0*wimgf0.conj())))
+            tf.imshow(np.angle((msk*wimgf1*wimgf0.conj())/(msk*wimgf0*wimgf0.conj())))
         a = np.sum(msk*wimgf1*wimgf0.conj())/np.sum(msk*wimgf0*wimgf0.conj())
         mag = np.abs(a)
         phase = np.angle(a)
@@ -331,20 +348,23 @@ class si3D(object):
         spmax = l[0]*d_sp - r_sp + spacing
         return (angmax,spmax,magarr.max())
 
-    def shift0(self):
+    def shift0(self,plot=False):
         nxh = self.nx
         nyh = self.ny
         nzh = self.nz
         self.otf0 = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         zsp = self.zerosuppression( 0., 0., 0.)
-        self.otf0[:] = self.cufftn(self.psf) * zsp
+        self.otf0[:] = fftn(self.psf) * zsp
         self.imgf0 = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
-        self.imgf0 = self.cufftn(self.img_0)
+        self.imgf0 = fftn(self.img_0)
         self.imgf0 = self.imgf0
         tf.imsave(join('otf_0.tif'),self.otf0)
         tf.imsave(join('imgf_0.tif'),self.imgf0)
+        if plot==True:
+            tf.imshow(np.abs(fftshift(self.otf0)), photometric='minisblack',title='Angle %d _ 0 order OTF'%self.nangle)
+            tf.imshow(np.abs(fftshift(self.imgf0)), photometric='minisblack',title='Angle %d _ 0 order frequency spectrum'%self.nangle)
 
-    def shift1(self,angle,spacingx,spacingz):
+    def shift1(self,angle,spacingx,spacingz,plot=False):
         ''' shift 1st order data '''
         dx = self.dx / 2
         dz = self.dz / 2
@@ -360,8 +380,8 @@ class si3D(object):
         ysh[1,:,:,:] = self.shiftmat(kz,-kx,-ky).astype(np.complex64)
         
         otf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
-        otf[:,:,:] = self.cufftn((self.psf*ysh[0]))
-        yshf = np.abs(self.cufftn(ysh[0]))
+        otf[:,:,:] = fftn((self.psf*ysh[0]))
+        yshf = np.abs(fftn(ysh[0]))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -374,9 +394,11 @@ class si3D(object):
         zsp = self.zerosuppression( sz, sx, sy)
         otf = otf * zsp
         tf.imsave(join('otf_1_0.tif'),otf)
+        if plot==True:
+            tf.imshow(np.abs(fftshift(otf)),photometric='minisblack',title='Angle %d _ 1st order +1 OTF'%self.nangle)
         otf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
-        otf[:,:,:] = self.cufftn((self.psf*ysh[1]))
-        yshf = np.abs(self.cufftn(ysh[1]))
+        otf[:,:,:] = fftn((self.psf*ysh[1]))
+        yshf = np.abs(fftn(ysh[1]))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -389,21 +411,27 @@ class si3D(object):
         zsp = self.zerosuppression( sz, sx, sy)
         otf = otf * zsp
         tf.imsave(join('otf_1_1.tif'),otf)
-        
+        if plot==True:
+            tf.imshow(np.abs(fftshift(otf)),photometric='minisblack',title='Angle %d _ 1st order -1 OTF'%self.nangle)
+
         ysh = np.zeros((2,2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         ysh[0,:,:,:] = self.shiftmat(0,kx,ky).astype(np.complex64)
         ysh[1,:,:,:] = self.shiftmat(0,-kx,-ky).astype(np.complex64)
         
         imgf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         imgf[:,:,:] = self.img_1_0
-        imgf[:,:,:] = self.cufftn(imgf*ysh[0])
+        imgf[:,:,:] = fftn(imgf*ysh[0])
         tf.imsave(join('imgf_1_0.tif'),imgf)
+        if plot==True:
+            tf.imshow(np.abs(fftshift(imgf)),photometric='minisblack',title='Angle %d _ 1st order +1 frequency spectrum'%self.nangle)
         imgf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         imgf[:,:,:] = self.img_1_1      
-        imgf[:,:,:] = self.cufftn(imgf*ysh[1])
-        tf.imsave(join('imgf_1_1.tif'),imgf)
+        imgf[:,:,:] = fftn(imgf*ysh[1])
+        tf.imsave(join('imgf_1_1.tif'),imgf)       
+        if plot==True:
+            tf.imshow(np.abs(fftshift(imgf)),photometric='minisblack',title='Angle %d _ 1st order -1 frequency spectrum'%self.nangle)
 
-    def shift2(self,angle,spacingx):
+    def shift2(self,angle,spacingx,plot=False):
         ''' shift 2nd order data '''
         dx = self.dx / 2
         nxh = self.nx
@@ -418,8 +446,8 @@ class si3D(object):
         ysh[1,:,:,:] = self.shiftmat(kz,-kx,-ky).astype(np.complex64)
         
         otf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
-        otf[:,:,:] = self.cufftn(self.psf*ysh[0])
-        yshf = np.abs(self.cufftn(ysh[0]))
+        otf[:,:,:] = fftn(self.psf*ysh[0])
+        yshf = np.abs(fftn(ysh[0]))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -432,9 +460,11 @@ class si3D(object):
         zsp = self.zerosuppression( sz, sx, sy)
         otf = otf * zsp
         tf.imsave(join('otf_2_0.tif'),otf)
+        if plot==True:
+            tf.imshow(np.abs(fftshift(otf)),photometric='minisblack',title='Angle %d _ 2nd order +1 OTF'%self.nangle)
         otf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
-        otf[:,:,:] = self.cufftn(self.psf*ysh[1])
-        yshf = np.abs(self.cufftn(ysh[1]))
+        otf[:,:,:] = fftn(self.psf*ysh[1])
+        yshf = np.abs(fftn(ysh[1]))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
             sx = sx
@@ -447,49 +477,63 @@ class si3D(object):
         zsp = self.zerosuppression( sz, sx, sy)
         otf = otf * zsp
         tf.imsave(join('otf_2_1.tif'),otf)
-        
+        if plot==True:
+            tf.imshow(np.abs(fftshift(otf)),photometric='minisblack',title='Angle %d _ 2nd order -1 OTF'%self.nangle)
+            
         imgf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         imgf[:,:,:] = self.img_2_0
-        imgf[:,:,:] = self.cufftn(imgf*ysh[0])
+        imgf[:,:,:] = fftn(imgf*ysh[0])
         tf.imsave(join('imgf_2_0.tif'),imgf)
+        if plot==True:
+            tf.imshow(np.abs(fftshift(imgf)),photometric='minisblack',title='Angle %d _ 2nd order +1 frequency spectrum'%self.nangle)
         imgf = np.zeros((2*nzh,2*nxh,2*nyh),dtype=np.complex64)
         imgf[:,:,:] = self.img_2_1        
-        imgf[:,:,:] = self.cufftn(imgf*ysh[1])
+        imgf[:,:,:] = fftn(imgf*ysh[1])
         tf.imsave(join('imgf_2_1.tif'),imgf)
-
-    def cufftn(self,img):
-        data = img.copy()
-        d_data = cuda.to_device(data)
-        fftplan = Plan.three(CUFFT_C2C, *data.shape)
-        fftplan.forward(d_data, d_data)
-        d_data.copy_to_host(data)
-        return data
-
-    def cuifftn(self,img):
-        data = img.copy()
-        d_data = cuda.to_device(data)
-        fftplan = Plan.three(CUFFT_C2C, *data.shape)
-        fftplan.inverse(d_data, d_data)
-        d_data.copy_to_host(data)
-        return data
+        if plot==True:
+            tf.imshow(np.abs(fftshift(imgf)),photometric='minisblack',title='Angle %d _ 2nd order -1 frequency spectrum'%self.nangle)
 
     def interp(self,arr):
         nz,nx,ny = arr.shape
-        pz = int(nz/2)
-        px = int(nx/2)
-        py = int(ny/2)
-        outarr = np.zeros((2*nz,2*nx,2*ny), dtype=np.complex64)
-        arrf = self.cufftn(arr.astype(np.complex64))
-        arro = np.pad(np.fft.fftshift(arrf),((pz,pz),(px,px),(py,py)),'constant', constant_values=(0))
-        outarr = self.cuifftn(np.fft.fftshift(arro))
+        outarr = np.zeros((2*nz,2*nx,2*ny), dtype=arr.dtype)
+        arrf = fftn(arr)
+        arro = self.pad(arrf)
+        outarr = ifftn(arro)
         return outarr
+
+    def pad(self,arr):
+        nz,nx,ny = arr.shape
+        out = np.zeros((2*nz,2*nx,2*nx),arr.dtype)
+        nxh = np.int(nx/2)
+        if nz%2==0:
+            nzh = np.int(nz/2)
+            out[:nzh,:nxh,:nxh] = arr[:nzh,:nxh,:nxh]
+            out[:nzh,:nxh,3*nxh:4*nxh] = arr[:nzh,:nxh,nxh:nx]
+            out[:nzh,3*nxh:4*nxh,:nxh] = arr[:nzh,nxh:nx,:nxh]
+            out[:nzh,3*nxh:4*nxh,3*nxh:4*nxh] = arr[:nzh,nxh:nx,nxh:nx]
+            out[3*nzh:4*nzh,:nxh,:nxh] = arr[nzh:nz,:nxh,:nxh]
+            out[3*nzh:4*nzh,:nxh,3*nxh:4*nxh] = arr[nzh:nz,:nxh,nxh:nx]
+            out[3*nzh:4*nzh,3*nxh:4*nxh,:nxh] = arr[nzh:nz,nxh:nx,:nxh]
+            out[3*nzh:4*nzh,3*nxh:4*nxh,3*nxh:4*nxh] = arr[nzh:nz,nxh:nx,nxh:nx]
+        else:
+            nzh = np.int(nz/2)
+            out[:nzh,:nxh,:nxh] = arr[:nzh,:nxh,:nxh]
+            out[:nzh,:nxh,3*nxh:4*nxh] = arr[:nzh,:nxh,nxh:nx]
+            out[:nzh,3*nxh:4*nxh,:nxh] = arr[:nzh,nxh:nx,:nxh]
+            out[:nzh,3*nxh:4*nxh,3*nxh:4*nxh] = arr[:nzh,nxh:nx,nxh:nx]
+            out[(3*nzh+1):(2*nz),:nxh,:nxh] = arr[nzh:nz,:nxh,:nxh]
+            out[(3*nzh+1):(2*nz),:nxh,3*nxh:4*nxh] = arr[nzh:nz,:nxh,nxh:nx]
+            out[(3*nzh+1):(2*nz),3*nxh:4*nxh,:nxh] = arr[nzh:nz,nxh:nx,:nxh]
+            out[(3*nzh+1):(2*nz),3*nxh:4*nxh,3*nxh:4*nxh] = arr[nzh:nz,nxh:nx,nxh:nx]
+        return out
     
     def zerosuppression(self,sz,sx,sy):
         x = self.xv
         y = self.yv
         z = self.zv
-        g = 1 - self.strength*np.exp(-(np.abs((x-sx)**2)+np.abs((y-sy)**2))+0.*np.abs((z-sz)**2))/(2*(self.fwhm**2))
-        g[g<self.thre] = self.minv
+        g = 1 - self.strength * np.exp(-((x-sx)**2.+(y-sy)**2.+0.*(z-sz)**2.)/(2.*self.sigma**2.))
+        g[g<0.5] = 0.0
+        g[g>=0.5] = 1.0
         return g
 
     def window(self,eta):
@@ -498,17 +542,18 @@ class si3D(object):
         ny = self.ny * 2
         wd = np.zeros((nz,nx,ny))
         wind = signal.tukey(nx, alpha=eta, sym=True)
+        wz = signal.tukey(nz, alpha=eta, sym=True)
         wx = np.tile(wind,(nx,1))
         wy = wx.swapaxes(0,1)
         w = wx * wy
         for i in range(nz):
-            wd[i,:,:,] = w
+            wd[i,:,:,] = w * wz[i]
         return wd
     
     def apod(self):
         rxy = 2.*self.radius_xy
         rz = 2.*self.radius_z
-        apo = ( 1 - self.axy * np.sqrt(self.xv**2 + self.yv**2) / rxy )**self.n * ( 1 - self.az * np.sqrt(self.zv**2) / rz )**self.n
+        apo = ( 1 - self.axy * np.sqrt(self.xv**2 + self.yv**2) / rxy )**self.expn * ( 1 - self.az * np.sqrt(self.zv**2) / rz )**self.expn
         rhxy = np.sqrt(self.xv**2 + self.yv**2 + 0.*self.zv**2)/rxy
         rhz = np.sqrt(0.*self.xv**2 + 0.*self.yv**2 + self.zv**2)/rz
         msk_xy = (rhxy<=1.0).astype(np.float64)
@@ -523,6 +568,7 @@ class si3D(object):
         ny = 2*self.ny
         nz = 2*self.nz
         mu = self.mu
+        ph0 = self.zoa
         ph1 = mag1*np.exp(1j*phase1)
         ph2 = mag2*np.exp(1j*phase2)
         
@@ -535,7 +581,7 @@ class si3D(object):
         # 0th order
         imgf = tf.imread(join('imgf_0.tif'))
         otf = tf.imread(join('otf_0.tif'))
-        Snum += otf.conj()*imgf
+        Snum += ph0*otf.conj()*imgf
         Sden += np.abs(otf)**2
         # +1st order
         imgf = tf.imread(join('imgf_1_0.tif'))
@@ -561,7 +607,7 @@ class si3D(object):
         S = Snum/Sden
         self.Snum = Snum
         self.Sden = Sden
-        self.finalimage = fftshift(self.cuifftn(S))
+        self.finalimage = fftshift(ifftn(S))
         return True
 
     def recon_add(self,phase1,mag1,phase2,mag2):
@@ -571,14 +617,15 @@ class si3D(object):
         nz = 2*self.nz
         ph1 = mag1*np.exp(1j*phase1)
         ph2 = mag2*np.exp(1j*phase2)
-
+        ph0 = self.zoa
+        
         imgf = np.zeros((nz,nx,ny),dtype=np.complex64)
         otf = np.zeros((nz,nx,ny),dtype=np.complex64)        
 
         # 0th order
         imgf = tf.imread(join('imgf_0.tif'))
         otf = tf.imread(join('otf_0.tif'))
-        self.Snum += otf.conj()*imgf
+        self.Snum += ph0*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
         # +1st order
         imgf = tf.imread(join('imgf_1_0.tif'))
@@ -602,6 +649,5 @@ class si3D(object):
         self.Sden += np.abs(otf)**2
         # finish
         S = self.Snum/self.Sden 
-        self.finalimage = fftshift(self.cuifftn(S))
+        self.finalimage = fftshift(ifftn(S))
         return True
-        
