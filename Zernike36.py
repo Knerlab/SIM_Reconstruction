@@ -4,7 +4,7 @@
 """
 
 import numpy as N
-from scipy.misc import factorial as fac
+from scipy.special import factorial as fac
 from operator import itemgetter
     
 def jnm(mx):
@@ -13,16 +13,17 @@ def jnm(mx):
     for n in range(mx):
         for m in range(-n,n+1,2):
             a.append((n,m,abs(m)))
+    #a.sort(lambda a,b: int(a[0]-b[0] or a[2]-b[2] or a[1]-b[1]))
     a.sort(key=itemgetter(0,2,1))
     c = []
     for j,t in enumerate(a):
         c.append(t[:2])
     b = N.array(c)
+    #return dict(zip(c,N.arange(mx)))
     return (b,dict(zip(c,N.arange(len(a)))))
 
 global nj, nb
 nb,nj = jnm(15)
-#nb,nh = mkl(15)
 
 def rhofunc(i,j,x0,y0,Nx):
 #    i = (i<=Nx/2)*i + (i>Nx/2)*(Nx-i)
@@ -81,7 +82,7 @@ def Z(m,n,rad=None,orig=None,Nx=256):
         Z = N.sqrt(2*(n+1))*R(abs(m),n,rad,cntr,Nx)*N.sin(m*theta)
     if not orig==None:
         orig = N.array(orig)-(Nx/2)
-        Z = N.roll(N.roll(Z,orig[0],0),orig[1],1)
+        Z = N.roll(N.roll(Z,int(orig[0]),0),int(orig[1]),1)
     return Z
     
 def Zm(j,rad=None,orig=None,Nx=256):
