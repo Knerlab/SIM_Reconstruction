@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 18 11:44:40 2020
-
-@author: linruizhe
+@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
 """
 
 import cupy
