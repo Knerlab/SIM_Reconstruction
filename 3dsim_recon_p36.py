@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 3D structured illumination reconstruction with python 3.6 
+
+@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
 """
 
 import os
