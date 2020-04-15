@@ -19,7 +19,7 @@ def discArray(shape=(128,128),radius=64,origin=None,dtype=np.float64):
     if not origin==None:
         s0 = origin[0]-int(nx/2)
         s1 = origin[1]-int(ny/2)
-        disc = np.roll(np.roll(disc,s0,0),s1,1)
+        disc = np.roll(np.roll(disc,int(s0),0),int(s1),1)
     return disc
 
 def radialArray(shape=(128,128), func=None, origin=None, dtype=np.float64):
@@ -35,15 +35,15 @@ def radialArray(shape=(128,128), func=None, origin=None, dtype=np.float64):
     if not origin==None:
         s0 = origin[0]-nx/2
         s1 = origin[1]-ny/2
-        rarr = np.roll(np.roll(rarr,s0,0),s1,1)
+        rarr = np.roll(np.roll(rarr,int(s0),0),int(s1),1)
     return rarr
     
 def shift(arr,shifts=None):
     if shifts == None:
-        shifts = np.array(arr.shape)/2
+        shifts = ( np.array(arr.shape)/2 ).astype(np.uint16)
     if len(arr.shape)==len(shifts):
         for m,p in enumerate(shifts):
-            arr = np.roll(arr,p,m)
+            arr = np.roll(arr,int(p),m)
     return arr
     
 def buildphiZ(phi,shape,radius):
