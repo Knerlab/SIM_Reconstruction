@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jan 26 16:49:21 2018
-
-@author: rl74173
+@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
 """
 
 import si_recon_3d_p36_cuda_new as si
