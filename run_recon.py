@@ -7,7 +7,7 @@ import si_recon_3d_p36_cuda_new as si
 import numpy as np
 import tifffile as tf
 
-fns = r'C:/Users/linruizhe/Documents/Python Scripts/3dsimrecon/sim_si3d_sp.tif'
+fns = r'***' #image path
 
 class sim3drecon(object):
     
