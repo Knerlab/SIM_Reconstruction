@@ -88,11 +88,9 @@ class sim3drecon(object):
         b2 = self.p.getoverlap2(self.x2_2[0], self.x2_2[1])
         self.p.recon_add(-a2[1], 1., -b2[1], 1.)  #self.p.recon_add(-a2[1], a2[0], -b2[1], b2[0])   #
         #Apod
-        # S = (self.p.Snum/self.p.Sden)*self.p.apd
-        # finalimage = np.fft.ifftn(S)
-        # tf.imsave('final_image_apo.tif',finalimage.real.astype(np.float32),photometric='minisblack')
-        # tf.imsave('effective_OTF_apo.tif',np.abs(np.fft.fftshift(S)).astype(np.float32),photometric='minisblack')
+        self.S = (self.p.Snum/self.p.Sden)*self.p.apd
+        self.finalimage = np.fft.ifftn(S)
         
     def saveimg(self):
-        tf.imsave('final_image.tif',np.fft.fftshift(self.p.finalimage).real.astype(np.float32),photometric='minisblack')
-        tf.imsave('effective_OTF.tif',np.abs(np.fft.fftshift(self.p.Snum/self.p.Sden)).astype(np.float32),photometric='minisblack')
+        tf.imsave('final_image.tif',np.fft.fftshift(self.finalimage).real.astype(np.float32),photometric='minisblack')
+        tf.imsave('effective_OTF.tif',np.abs(np.fft.fftshift(self.S)).astype(np.float32),photometric='minisblack')
