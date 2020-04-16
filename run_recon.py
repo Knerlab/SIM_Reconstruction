@@ -66,25 +66,25 @@ class sim3drecon(object):
         self.p.shift0()
         self.p.shift1(self.x0_1[0], self.x0_1[1], self.z0[0])
         self.p.shift2(self.x0_2[0],self.x0_2[1])
-        a0 = self.p.getoverlap1(self.x0_1[0], self.x0_1[1], self.z0[0]) 
-        b0 = self.p.getoverlap2(self.x0_2[0], self.x0_2[1])
-        self.p.recon1(-a0[1], 1., -b0[1], 1.) #self.p.recon1(-a0[1], a0[0], -b0[1], b0[0])  #
+        self.a0 = self.p.getoverlap1(self.x0_1[0], self.x0_1[1], self.z0[0]) 
+        self.b0 = self.p.getoverlap2(self.x0_2[0], self.x0_2[1])
+        self.p.recon1(-self.a0[1], self.a0[0], -self.b0[1], self.b0[0])
         #2nd angle
         self.p.separate(1)
         self.p.shift0()
         self.p.shift1(self.x1_1[0], self.x1_1[1], self.z1[0])
         self.p.shift2(self.x1_2[0],self.x1_2[1])
-        a1 = self.p.getoverlap1(self.x1_1[0], self.x1_1[1], self.z1[0]) 
-        b1 = self.p.getoverlap2(self.x1_2[0], self.x1_2[1])
-        self.p.recon_add(-a1[1], 1., -b1[1], 1.)  #self.p.recon_add(-a1[1], a1[0], -b1[1], b1[0])   #
+        self.a1 = self.p.getoverlap1(self.x1_1[0], self.x1_1[1], self.z1[0]) 
+        self.b1 = self.p.getoverlap2(self.x1_2[0], self.x1_2[1])
+        self.p.recon_add(-self.a1[1], self.a1[0], -self.b1[1], self.b1[0])
         #3rd angle
         self.p.separate(2)
         self.p.shift0()
         self.p.shift1(self.x2_1[0], self.x2_1[1], self.z2[0])
         self.p.shift2(self.x2_2[0],self.x2_2[1])
-        a2 = self.p.getoverlap1(self.x2_1[0], self.x2_1[1], self.z2[0]) 
-        b2 = self.p.getoverlap2(self.x2_2[0], self.x2_2[1])
-        self.p.recon_add(-a2[1], 1., -b2[1], 1.)  #self.p.recon_add(-a2[1], a2[0], -b2[1], b2[0])   #
+        self.a2 = self.p.getoverlap1(self.x2_1[0], self.x2_1[1], self.z2[0]) 
+        self.b2 = self.p.getoverlap2(self.x2_2[0], self.x2_2[1])
+        self.p.recon_add(-self.a2[1], self.a2[0], -self.b2[1], self.b2[0])
         #Apod
         self.S = (self.p.Snum/self.p.Sden)*self.p.apd
         self.finalimage = np.fft.ifftn(S)
