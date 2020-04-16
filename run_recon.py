@@ -3,7 +3,7 @@
 @copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
 """
 
-import si_recon_3d_p36_cuda_new as si
+import sim3d_recon_p36 as si
 import numpy as np
 import tifffile as tf
 
