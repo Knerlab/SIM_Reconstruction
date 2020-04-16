@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-3D structured illumination reconstruction with python 3.6 
-
+3D structured illumination microscopy image reconstruction algorithm
 @copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
 """
 
@@ -576,10 +575,8 @@ class si3D(object):
         Snum += ph2.conj()*otf.conj()*imgf
         Sden += np.abs(otf)**2
         # finish
-        S = Snum/Sden
         self.Snum = Snum
         self.Sden = Sden
-        self.finalimage = fftshift(ifftn(S))
         return True
 
     def recon_add(self,phase1,mag1,phase2,mag2):
@@ -619,7 +616,4 @@ class si3D(object):
         otf = tf.imread(join('otf_2_1.tif'))
         self.Snum += ph2.conj()*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
-        # finish
-        S = self.Snum/self.Sden 
-        self.finalimage = fftshift(ifftn(S))
         return True
