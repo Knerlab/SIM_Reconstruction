@@ -1,4 +1,8 @@
-
+# -*- coding: utf-8 -*-
+"""
+An example of running the 3D structured illumination microscopy image reconstruction codes
+@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+"""
 
 import si_recon_3d_p36_latest as si
 import numpy as np
