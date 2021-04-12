@@ -5,7 +5,7 @@
 """
 
 import os
-temppath = r'C:/Users/***/Documents/Python Scripts/temp'
+temppath = r'C:/Users/rl74173/Documents/PythonScripts/temp'
 join = lambda fn: os.path.join(temppath,fn)
 
 import tifffile as tf
@@ -20,8 +20,9 @@ class si3D(object):
 
     def __init__(self, fnd, nph, nangles, wavelength, na):
         self.img_stack = tf.imread(fnd)
-        self.img_stack = self.subback(self.img_stack)
+        # self.img_stack = self.subback(self.img_stack)
         self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
+        print('Image stack loaded succefully')
         nz,nx,ny = self.img_stack.shape
         self.nz = int(nz/nph/nangles)
         self.nx = nx
@@ -135,13 +136,13 @@ class si3D(object):
         dz = self.dz / 2
         kx = dx*np.cos(angle)/(spacingx*2)
         ky = dx*np.sin(angle)/(spacingx*2)
-        kz = dz/spacingz
+        kz = dz/spacingz     
+      
+        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
+        otf = fftn((self.psf*ysh))
         
         nxh = self.nx
         nyh = self.ny
-        
-        ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
-        otf = fftn((self.psf*ysh))
         yshf = np.abs(fftn(ysh))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
@@ -257,11 +258,11 @@ class si3D(object):
         ky = dx*np.sin(angle)/spacingx
         kz = 0
         
-        nxh = self.nx
-        nyh = self.ny
-        
         ysh = np.exp(2j*np.pi*(kx*self.xv+ky*self.yv+kz*self.zv))
         otf = fftn(self.psf*ysh)
+        
+        nxh = self.nx
+        nyh = self.ny
         yshf = np.abs(fftn(ysh))
         sz, sx, sy = np.unravel_index(yshf.argmax(), yshf.shape)
         if (sx<nxh):
@@ -546,37 +547,47 @@ class si3D(object):
         imgf = np.zeros((nz,nx,nx),dtype=np.complex64)
         otf = np.zeros((nz,nx,nx),dtype=np.complex64)        
         
-        Snum = np.zeros((nz,nx,ny),dtype=np.complex64)
-        Sden = np.zeros((nz,nx,ny),dtype=np.complex64)
-        Sden += mu**2
+        self.Snum = np.zeros((nz,nx,ny),dtype=np.complex64)
+        self.Sden = np.zeros((nz,nx,ny),dtype=np.complex64)
+        self.Sden += mu**2
         # 0th order
         imgf = tf.imread(join('imgf_0.tif'))
+        tf.imsave('angle%d_imgf_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_0.tif'))
-        Snum += ph0*otf.conj()*imgf
-        Sden += np.abs(otf)**2
+        tf.imsave('angle%d_otf_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph0 * otf.conj() * imgf
+        self.Sden += np.abs(otf)**2
         # +1st order
         imgf = tf.imread(join('imgf_1_0.tif'))
+        tf.imsave('angle%d_imgf_1_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_1_0.tif'))
-        Snum += ph1*otf.conj()*imgf
-        Sden += np.abs(otf)**2
+        tf.imsave('angle%d_otf_1_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph1*otf.conj()*imgf
+        self.Sden += np.abs(otf)**2
         # -1 order
         imgf = tf.imread(join('imgf_1_1.tif'))
+        tf.imsave('angle%d_imgf_1_1.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_1_1.tif'))
-        Snum += ph1.conj()*otf.conj()*imgf
-        Sden += np.abs(otf)**2
+        tf.imsave('angle%d_otf_1_1.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph1.conj()*otf.conj()*imgf
+        self.Sden += np.abs(otf)**2
         # +2nd order
         imgf = tf.imread(join('imgf_2_0.tif'))
+        tf.imsave('angle%d_imgf_2_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_2_0.tif'))
-        Snum += ph2*otf.conj()*imgf
-        Sden += np.abs(otf)**2
+        tf.imsave('angle%d_otf_2_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph2*otf.conj()*imgf
+        self.Sden += np.abs(otf)**2
         # -2nd order
         imgf = tf.imread(join('imgf_2_1.tif'))
+        tf.imsave('angle%d_imgf_2_1.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_2_1.tif'))
-        Snum += ph2.conj()*otf.conj()*imgf
-        Sden += np.abs(otf)**2
-        # finish
-        self.Snum = Snum
-        self.Sden = Sden
+        tf.imsave('angle%d_otf_2_1.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph2.conj()*otf.conj()*imgf
+        self.Sden += np.abs(otf)**2
+        # # finish
+        # S = self.Snum/self.Sden
+        # self.finalimage = ifftn(S)
         return True
 
     def recon_add(self,phase1,mag1,phase2,mag2):
@@ -590,30 +601,42 @@ class si3D(object):
         
         imgf = np.zeros((nz,nx,ny),dtype=np.complex64)
         otf = np.zeros((nz,nx,ny),dtype=np.complex64)        
-
         # 0th order
         imgf = tf.imread(join('imgf_0.tif'))
+        tf.imsave('angle%d_imgf_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_0.tif'))
-        self.Snum += ph0*otf.conj()*imgf
+        tf.imsave('angle%d_otf_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
+        self.Snum += ph0 * otf.conj() * imgf
         self.Sden += np.abs(otf)**2
         # +1st order
         imgf = tf.imread(join('imgf_1_0.tif'))
+        tf.imsave('angle%d_imgf_1_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_1_0.tif'))
+        tf.imsave('angle%d_otf_1_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
         self.Snum += ph1*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
         # -1 order
         imgf = tf.imread(join('imgf_1_1.tif'))
+        tf.imsave('angle%d_imgf_1_1.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_1_1.tif'))
+        tf.imsave('angle%d_otf_1_1.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
         self.Snum += ph1.conj()*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
         # +2nd order
         imgf = tf.imread(join('imgf_2_0.tif'))
+        tf.imsave('angle%d_imgf_2_0.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_2_0.tif'))
+        tf.imsave('angle%d_otf_2_0.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
         self.Snum += ph2*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
         # -2nd order
         imgf = tf.imread(join('imgf_2_1.tif'))
+        tf.imsave('angle%d_imgf_2_1.tif'%self.nangle,np.abs(np.fft.fftshift(imgf)).astype(np.float32),photometric='minisblack')
         otf = tf.imread(join('otf_2_1.tif'))
+        tf.imsave('angle%d_otf_2_1.tif'%self.nangle,np.abs(np.fft.fftshift(otf)).astype(np.float32),photometric='minisblack')
         self.Snum += ph2.conj()*otf.conj()*imgf
         self.Sden += np.abs(otf)**2
+        # # finish
+        # S = self.Snum/self.Sden 
+        # self.finalimage = fftshift(ifftn(S))
         return True
