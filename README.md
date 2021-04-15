@@ -9,6 +9,6 @@ This code accompanies the manuscript *Subcellular three-dimensional imaging deep
 thick samples by structured illumination microscopy and adaptive optics* by 
 Ruizhe Lin, Edward T. Kipreos, Jie Zhu, Chang Hyun Khang, and Peter Kner  
 [Posted to bioRxiv](https://www.biorxiv.org/content/10.1101/2020.04.15.043026v1)  
-Submitted to *Nature Communicatons*.
+Submitted to *Nature Communications*.
 ***
 

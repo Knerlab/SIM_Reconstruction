@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
+These functions are utilities used in different packages
+@copyright, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
 """
 
 import numpy as np

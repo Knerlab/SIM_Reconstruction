@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 An example of running the 3D structured illumination microscopy image reconstruction codes
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+@copyright, Ruizhe Lin and Peter Kner, University of Georgia, 2021
+
 """
 
-import si_recon_3d_p36_latest as si
+import sim_3drecon_p36 as si
 import numpy as np
 
 fns = r'###'  # raw 3dsim data file

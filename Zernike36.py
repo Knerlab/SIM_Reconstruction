@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
+
+These functions generate the Zernike functions on the unit circle
 @copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
 """
 
 import numpy as N
@@ -86,6 +89,6 @@ def Z(m,n,rad=None,orig=None,Nx=256):
     return Z
     
 def Zm(j,rad=None,orig=None,Nx=256):
-    ''' now, with Noll ordering '''
+    ''' Zernike modes with single index now, with Noll ordering '''
     n,m = nb[j]
     return Z(m,n,rad,orig,Nx)

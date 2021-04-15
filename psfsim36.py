@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
+This class generates simulated PSFs and OTFs
+@copyright, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
 """
 
 import numpy as np
@@ -14,15 +17,17 @@ pi = np.pi
 from scipy.special import j1
 
 class psf(object):
+    ''' code for simulating the point spread function
+        main function is get3Dpsf() '''
 
     def __init__(self):
-        self.wl = 0.515
-        self.na = 1.2
-        self.n2 = 1.512
-        self.dx = 0.089
-        self.nx = 256
-        self.dp = 1/(self.nx*self.dx)
-        self.radius = (self.na/self.wl)/self.dp
+        self.wl = 0.515 # wavelength in microns
+        self.na = 1.2 # numerical aperture
+        self.n2 = 1.512 # index at point
+        self.dx = 0.089 # pixel size in microns
+        self.nx = 256 # size of region
+        self.dp = 1/(self.nx*self.dx) # pixel size in frequency space (pupil)
+        self.radius = (self.na/self.wl)/self.dp # radius of pupil (NA/lambda) in pixels
         self.zarr = np.zeros(15)
         
     def __del__(self):

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 3D structured illumination microscopy image reconstruction algorithm
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+@copyright, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
 """
 
 import os
@@ -19,7 +20,7 @@ from scipy import signal
 class si3D(object):
 
     def __init__(self, fnd, nph, nangles, wavelength, na):
-        self.img_stack = tf.imread(fnd)
+        self.img_stack = tf.imread(fnd) # order of images should be phases, angles, zslices
         # self.img_stack = self.subback(self.img_stack)
         self.img_stack = np.pad(self.img_stack, ((2*nph*nangles,2*nph*nangles),(0,0),(0,0)),'constant', constant_values=(0))
         print('Image stack loaded succefully')
@@ -27,17 +28,17 @@ class si3D(object):
         self.nz = int(nz/nph/nangles)
         self.nx = nx
         self.ny = ny
-        self.mu = 1e-2
-        self.wl = wavelength
-        self.cutoff = 1e-3
-        self.na = na
-        self.dx = 0.089
-        self.dz = 0.2
+        self.mu = 1e-2 # Wiener parameter
+        self.wl = wavelength # in microns
+        self.cutoff = 1e-3 # remove noise below this relative value in freq. space
+        self.na = na # numerical aperture
+        self.dx = 0.089 # pixel size in microns
+        self.dz = 0.2 # z step in microns
         self.nphases = nph
         self.norders = 5
-        self.dpx = 1/((self.nx*2.)*(self.dx/2.))
-        self.dpz = 1/((self.nz*2.)*(self.dz/2.))
-        self.radius_xy = (2*self.na/self.wl)/self.dpx
+        self.dpx = 1/((self.nx*2.)*(self.dx/2.)) # calculate pixel size in frequency space
+        self.dpz = 1/((self.nz*2.)*(self.dz/2.)) # calculate axial pixel size in frequency space
+        self.radius_xy = (2*self.na/self.wl)/self.dpx # NA in pixels
         self.radius_z = ((self.na**2)/(2*self.wl))/self.dpz
         self.strength = 1.
         self.sigma = 8.
@@ -81,6 +82,7 @@ class si3D(object):
         self.yv = yv
 
     def shiftmat(self,kz,kx,ky):
+        ''' multiply by exponential in real space to create shift in frequency space  '''
         zv = self.zv
         xv = self.xv
         yv = self.yv
@@ -88,6 +90,7 @@ class si3D(object):
         return a
 
     def sepmatrix(self):
+        ''' create matrix to separate orders from raw data '''
         nphases = self.nphases
         norders = self.norders
         sepmat = np.zeros((norders,nphases),dtype=np.float32)
@@ -101,6 +104,7 @@ class si3D(object):
         return sepmat
 
     def getpsf(self):
+        ''' get simulated PSF for OTF calculations '''
         nz = self.nz
         nx = self.nx * 2
         dz = self.dz / 2
@@ -118,6 +122,7 @@ class si3D(object):
         return psf1
         
     def separate(self, nang=0):
+        ''' separate raw sim data into orders '''
         self.nangle = nang
         npx = self.nz*self.nx*self.ny
         nz = self.nz
@@ -131,7 +136,7 @@ class si3D(object):
         self.img_2_1 = fftshift(self.interp((out[3]-1j*out[4]).reshape(nz,nx,ny))*self.winf)
 
     def getoverlap1(self,angle,spacingx,spacingz,plot=False):
-        ''' shift 2nd order data '''
+        ''' calculate overlap between 0th and 1st order in xy '''
         dx = self.dx / 2
         dz = self.dz / 2
         kx = dx*np.cos(angle)/(spacingx*2)
@@ -175,6 +180,7 @@ class si3D(object):
         return mag, phase
 
     def mapoverlap1(self,angle,spacing,spz,nps=10,r_ang=0.02,r_sp=0.008):
+        ''' find optimal spacing and angle for first order in xy '''
         d_ang = 2*r_ang/nps
         d_sp = 2*r_sp/nps
         ang_iter = np.arange(-r_ang,r_ang+d_ang/2,d_ang)+angle
@@ -202,7 +208,7 @@ class si3D(object):
         return (angmax,spmax,magarr.max())
 
     def getoverlapz(self,angle,spacingx,spacingz):
-        ''' shift 2nd order data '''
+        ''' find optimal spacing in z direction for 1st order '''
         dx = self.dx / 2
         dz = self.dz / 2
         kx = dx*np.cos(angle)/(spacingx*2)
@@ -233,6 +239,7 @@ class si3D(object):
         return temp
 
     def mapoverlapz(self,angle,spacing,spz,nps=10,r_spz=0.1):
+        ''' Find optimal spacing in axial direction for 1st order '''
         d_spz = 2*r_spz/nps
         spz_iter = np.arange(-r_spz,r_spz+d_spz/2,d_spz)+spz
         magarr = np.zeros((nps+1))
@@ -252,7 +259,7 @@ class si3D(object):
         return (spzmax)
 
     def getoverlap2(self,angle,spacingx,plot=False):
-        ''' shift 2nd order data '''
+        ''' calculate overlop between 2nd and 0th order '''
         dx = self.dx / 2
         kx = dx*np.cos(angle)/spacingx
         ky = dx*np.sin(angle)/spacingx
@@ -294,6 +301,7 @@ class si3D(object):
         return mag, phase
 
     def mapoverlap2(self,angle,spacing,nps=10,r_ang=0.02,r_sp=0.008):
+        ''' find optimal spacing and angle for 2nd order '''
         d_ang = 2*r_ang/nps
         d_sp = 2*r_sp/nps
         ang_iter = np.arange(-r_ang,r_ang+d_ang/2,d_ang)+angle
@@ -321,6 +329,7 @@ class si3D(object):
         return (angmax,spmax,magarr.max())
 
     def shift0(self,plot=False):
+        ''' pad 0th order data, create 0th order OTF '''
         nxh = self.nx
         nyh = self.ny
         nzh = self.nz
@@ -466,6 +475,7 @@ class si3D(object):
             tf.imshow(np.abs(fftshift(imgf)),photometric='minisblack',title='Angle %d _ 2nd order -1 frequency spectrum'%self.nangle)
 
     def interp(self,arr):
+        ''' interpolate by padding in frequency space '''
         nz,nx,ny = arr.shape
         outarr = np.zeros((2*nz,2*nx,2*ny), dtype=arr.dtype)
         arrf = fftn(arr)
@@ -474,6 +484,7 @@ class si3D(object):
         return outarr
 
     def pad(self,arr):
+        ''' pad with zeros keeping zero frequency at corner '''
         nz,nx,ny = arr.shape
         out = np.zeros((2*nz,2*nx,2*nx),arr.dtype)
         nxh = np.int(nx/2)
@@ -500,6 +511,7 @@ class si3D(object):
         return out
     
     def zerosuppression(self,sz,sx,sy):
+        ''' suppress zero frequency in SIM reconstruction '''
         x = self.xv
         y = self.yv
         z = self.zv
@@ -509,6 +521,7 @@ class si3D(object):
         return g
 
     def window(self,eta):
+        ''' windowing to avoid edge effects in FFT '''
         nz = self.nz * 2
         nx = self.nx * 2
         ny = self.ny * 2
@@ -523,6 +536,7 @@ class si3D(object):
         return wd
     
     def apod(self):
+        ''' apodization to avoid ringing '''
         rxy = 2.*self.radius_xy
         rz = 2.*self.radius_z
         apo = ( 1 - self.axy * np.sqrt(self.xv**2 + self.yv**2) / rxy )**self.expn * ( 1 - self.az * np.sqrt(self.zv**2) / rz )**self.expn
@@ -535,6 +549,7 @@ class si3D(object):
         return apodiz
 
     def recon1(self,phase1,mag1,phase2,mag2):
+        ''' SIM reconstruction of one angle '''
         # construct 1 angle
         nx = 2*self.nx
         ny = 2*self.ny
@@ -591,6 +606,7 @@ class si3D(object):
         return True
 
     def recon_add(self,phase1,mag1,phase2,mag2):
+        ''' add additional angles to SIM reconstruction '''
         # construct 1 angle
         nx = 2*self.nx
         ny = 2*self.ny

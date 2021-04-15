@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-@copywrite, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
+This class will create a SIM reconstruction using the si3D class for optimizing the reconstruction parameters
+and performing the reconstruction
+@copyright, Ruizhe Lin and Peter Kner, University of Georgia, 2019
+
 """
 
 import sim3d_recon_p36 as si
