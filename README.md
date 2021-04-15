@@ -11,4 +11,5 @@ Ruizhe Lin, Edward T. Kipreos, Jie Zhu, Chang Hyun Khang, and Peter Kner
 [Posted to bioRxiv](https://www.biorxiv.org/content/10.1101/2020.04.15.043026v1)  
 Submitted to *Nature Communications*.
 ***
+[![DOI](https://zenodo.org/badge/220368462.svg)](https://zenodo.org/badge/latestdoi/220368462)
 
